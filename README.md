@@ -7,7 +7,7 @@ Simple _irc_ to _Matrix_ bridge
 How-to
 ======
 
-Just copy `config_sample.yml` to `config.yml` and modify it
+Just copy `config_sample.yal` to `config.yaml` and modify it
 
 
 Setting up the python venv
@@ -19,6 +19,6 @@ source venv/bin/activate
 pip install matrix-nio
 pip install git+https://github.com/TotallyNotRobots/async-irc.git
 
-python relay.py config.yml
+python relay.py config.yaml
 ```
 
