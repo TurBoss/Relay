@@ -1,0 +1,24 @@
+general:
+  debug: 0
+
+matrix:
+  host: "https://matrix.org"
+  domain: "matrix.org"
+  name: "test"
+  user: "@test-bot:matrix.org"
+  token: ""
+  pwd: ""
+
+irc:
+  host: "irc.libera.chat"
+  port: 6697
+  sasl: 1
+  user: ""
+  pwd: ""
+
+rooms:
+  test:
+    enabled: 1
+    irc_room: "#matrix_irc_test"
+    matrix_room: "#matrix_test:jauriarts.org"
+    matrix_room_id: "!epAOPLpSdPTuexvBHq:jauriarts.org"
