@@ -7,7 +7,7 @@ Simple _irc_ to _Matrix_ bridge
 How-to
 ======
 
-Just copy `config_sample.yal` to `config.yaml` and modify it
+Just copy `config_sample.yaml` to `config.yaml` and modify it
 
 
 Setting up the python venv
