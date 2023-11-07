@@ -85,7 +85,6 @@ class Relay:
         # If you made a new room and haven't joined as that user, you can use
         for _, room in self.relayed_rooms.items():
             room_enabled = room["enabled"]
-            print(room_enabled)
             if room_enabled:
                 await self.matrix_client.join(room["matrix_room"])
             
@@ -94,9 +93,9 @@ class Relay:
     async def irc_handler(self, conn: 'IrcProtocol', message: 'Message'):
     
         if message.command == "NOTICE":
-            # self.log.debug(message.command, len(message.parameters))
-            self.log.debug(message.parameters)
-            
+            for params in range(len(message.parameters)):
+                self.log.debug(f"NOTICE: {params}")
+                
         elif message.command == "PRIVMSG":
             # self.log.debug(message.command, len(message.parameters))
             message_sender = message.prefix.ident
