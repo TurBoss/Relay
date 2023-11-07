@@ -1,2 +1,3 @@
 git+https://github.com/TotallyNotRobots/async-irc.git
 git+https://github.com/poljar/matrix-nio.git
+git+https://github.com/yaml/pyyaml.git
