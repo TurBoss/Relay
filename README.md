@@ -13,12 +13,10 @@ Just copy `config_sample.yaml` to `config.yaml` and modify it
 Setting up the python venv
 
 
-```python
+```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install matrix-nio
-pip install git+https://github.com/TotallyNotRobots/async-irc.git
-
+pip install -r requirements.txt
 python relay.py config.yaml
 ```
 
