@@ -9,7 +9,7 @@ import yaml
 
 from time import sleep
 
-from nio import AsyncClient, MatrixRoom, RoomMessageText, LoginResponse
+from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessageImage, LoginResponse
 
 from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
@@ -62,7 +62,9 @@ class Relay:
         ]
         
         self.matrix_client = AsyncClient(self.matrix_host, self.matrix_user)
-        self.matrix_client.add_event_callback(self.matrix_handler, RoomMessageText)
+        self.matrix_client.add_event_callback(self.matrix_msg_handler, RoomMessageText)
+        self.matrix_client.add_event_callback(self.matrix_img_handler, RoomMessageImage)
+        
         resp = await self.matrix_client.login(self.matrix_pwd, device_name="RelayHost")
         
         # check that we logged in successfully
@@ -92,6 +94,10 @@ class Relay:
         
     async def irc_handler(self, conn: 'IrcProtocol', message: 'Message'):
     
+
+        if not self.accepted_matrix:
+            return
+        
         if message.command == "NOTICE":
             for params in range(len(message.parameters)):
                 self.log.debug(f"NOTICE: {params}")
@@ -133,11 +139,15 @@ class Relay:
                 self.log.debug(f"{params}")
     
     
-    async def matrix_handler(self, room: 'MatrixRoom', event: 'RoomMessageText') -> None:
+    async def matrix_msg_handler(self, room: 'MatrixRoom', event: 'RoomMessageText') -> None:
         # self.log.debug(
         #     f"Message received in room {room.display_name} {room.room_id}\n"
         #     f"{room.user_name(event.sender)} | {event.body}"
         # )
+        
+
+        if not self.accepted_irc:
+            return
         
         await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
         
@@ -162,7 +172,39 @@ class Relay:
                         self.irc_conn.send_command(msg)
                     
         
+    async def matrix_img_handler(self, room: 'MatrixRoom', event: 'RoomMessageImage') -> None:
 
+        if not self.accepted_irc:
+            return
+
+        
+        await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
+        
+        message_sender = room.user_name(event.sender)
+        
+        if message_sender == self.matrix_name:
+            return
+        
+        matrix_room = room.room_id
+        mxc_url = event.url
+        
+        o = urlparse(mxc_url)
+        domain = o.netloc
+        pic_code = o.path
+        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, pic_code)
+        self.log.debug(url)
+        
+        for room_name, room_data in self.relayed_rooms.items():
+            # self.log.debug(room_name, room_data)
+            if matrix_room == room_data["matrix_room_id"]:
+                room_enabled = room_data['enabled']
+                if room_enabled:
+                    irc_room = room_data['irc_room']
+                    
+                    while url:
+                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {url[:400]}"
+                        url = url[400:]
+                        self.irc_conn.send_command(msg)
 
 async def main(argv) -> None:
     
