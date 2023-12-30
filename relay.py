@@ -167,10 +167,11 @@ class Relay:
                     irc_room = room_data['irc_room']
                     
                     while message_body:
-                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {message_body[:200]}"
+                        text = message_body[:200]
                         message_body = message_body[200:]
+                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {text}"
+                        print(msg)
                         self.irc_conn.send_command(msg)
-                        
                         sleep(0.5)
                     
         
