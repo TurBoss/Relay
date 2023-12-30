@@ -171,7 +171,7 @@ class Relay:
                         message_body = message_body[400:]
                         self.irc_conn.send_command(msg)
                         
-                        sleep(500)
+                        sleep(0.5)
                     
         
     async def matrix_img_handler(self, room: 'MatrixRoom', event: 'RoomMessageImage') -> None:
