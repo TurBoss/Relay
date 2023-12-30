@@ -8,6 +8,7 @@ import asyncio
 import yaml
 
 from time import sleep
+from io import StringIO
 
 from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessageImage, LoginResponse
 
@@ -169,8 +170,8 @@ class Relay:
                     while message_body:
                         text = message_body[:200]
                         message_body = message_body[200:]
-                        for readline in text.readline():
-                            msg = f"PRIVMSG {irc_room} :<{message_sender}> {text}"
+                        for line in StringIO(text):
+                            msg = f"PRIVMSG {irc_room} :<{message_sender}> {line}"
                             print(msg)
                             self.irc_conn.send_command(msg)
                             sleep(0.5)
