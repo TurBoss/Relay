@@ -167,15 +167,20 @@ class Relay:
                 if room_enabled:
                     irc_room = room_data['irc_room']
                     
-                    while message_body:
-                        text = message_body[:200]
-                        message_body = message_body[200:]
-                        for line in StringIO(text):
-                            msg = f"PRIVMSG {irc_room} :<{message_sender}> {line}"
+                    # while message_body:
+                    # text = message_body[:400]
+                    # message_body = message_body[400:]
+                    
+                    for line_no, line in enumerate(StringIO(message_body)):
+                        if line_no % 5 == 0:
+                            sleep(5)
+                            
+                        while line:
+                            msg = f"PRIVMSG {irc_room} :<{message_sender}> {line[:200]}"
+                            line = line[200:]
                             print(msg)
                             self.irc_conn.send_command(msg)
-                            sleep(2.5)
-                    
+                        
         
     async def matrix_img_handler(self, room: 'MatrixRoom', event: 'RoomMessageImage') -> None:
 
