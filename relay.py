@@ -81,7 +81,7 @@ class Relay:
         
         self.irc_conn = IrcProtocol(self.servers, self.irc_user, loop=loop)
         self.irc_conn.register_cap('userhost-in-names')
-        self.irc_conn.register('*', self.irc_handler)  
+        self.irc_conn.register('*', self.irc_msg_handler)  
         
         await self.irc_conn.connect()
                 
@@ -93,9 +93,8 @@ class Relay:
             
         await self.matrix_client.sync_forever(timeout=30000)  # milliseconds
         
-    async def irc_handler(self, conn: 'IrcProtocol', message: 'Message'):
+    async def irc_msg_handler(self, conn: 'IrcProtocol', message: 'Message'):
     
-
         if not self.accepted_matrix:
             return
         
@@ -106,7 +105,7 @@ class Relay:
         elif message.command == "PRIVMSG":
             # self.log.debug(message.command, len(message.parameters))
             message_sender = message.prefix.ident
-            
+            sender_alias = message.prefix.nick
             if message_sender == self.irc_user:
                 return
             
@@ -123,7 +122,7 @@ class Relay:
                         
                         await self.matrix_client.room_send(room_id=matrix_room_id,
                             message_type="m.room.message",
-                            content={"msgtype": "m.text", "body": f"<{message_sender}> {message_body}"},
+                            content={"msgtype": "m.text", "body": f"<{sender_alias}> {message_body}"},
                         )
         
         elif message.command == "900":
@@ -178,7 +177,7 @@ class Relay:
                         while line:
                             msg = f"PRIVMSG {irc_room} :<{message_sender}> {line[:200]}"
                             line = line[200:]
-                            print(msg)
+                            # print(msg)
                             self.irc_conn.send_command(msg)
                         
         
