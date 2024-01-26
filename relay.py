@@ -156,6 +156,9 @@ class Relay:
         if message_sender == self.matrix_name:
             return
         
+        if '@_discord_' in message_sender:
+            message_sender = message_sender[:-45]
+
         matrix_room = room.room_id
         message_body = event.body
         
