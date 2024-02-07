@@ -6,6 +6,7 @@ import sys
 import logging
 import asyncio
 import yaml
+import re
 
 from time import sleep
 from io import StringIO
@@ -161,6 +162,11 @@ class Relay:
 
         matrix_room = room.room_id
         message_body = event.body
+        
+        index = message_body.find("@_discord_")
+        
+        if index != -1:
+            message_body = re.sub("\(@_discord_\d*:jauriarts.org\)", "", message_body)
         
         for room_name, room_data in self.relayed_rooms.items():
             # self.log.debug(room_name, room_data)
