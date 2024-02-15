@@ -11,7 +11,7 @@ import re
 from time import sleep
 from io import StringIO
 
-from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessageImage, LoginResponse
+from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessageImage, RoomMessageVideo, LoginResponse
 
 from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
@@ -66,6 +66,7 @@ class Relay:
         self.matrix_client = AsyncClient(self.matrix_host, self.matrix_user)
         self.matrix_client.add_event_callback(self.matrix_msg_handler, RoomMessageText)
         self.matrix_client.add_event_callback(self.matrix_img_handler, RoomMessageImage)
+        self.matrix_client.add_event_callback(self.matrix_vid_handler, RoomMessageVideo)
         
         resp = await self.matrix_client.login(self.matrix_pwd, device_name="RelayHost")
         
@@ -210,6 +211,40 @@ class Relay:
         domain = o.netloc
         pic_code = o.path
         url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, pic_code)
+        self.log.debug(url)
+        
+        for room_name, room_data in self.relayed_rooms.items():
+            # self.log.debug(room_name, room_data)
+            if matrix_room == room_data["matrix_room_id"]:
+                room_enabled = room_data['enabled']
+                if room_enabled:
+                    irc_room = room_data['irc_room']
+                    
+                    while url:
+                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {url[:400]}"
+                        url = url[400:]
+                        self.irc_conn.send_command(msg)
+                        
+    async def matrix_vid_handler(self, room: 'MatrixRoom', event: 'RoomMessageVideo') -> None:
+
+        if not self.accepted_irc:
+            return
+
+        
+        await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
+        
+        message_sender = room.user_name(event.sender)
+        
+        if message_sender == self.matrix_name:
+            return
+        
+        matrix_room = room.room_id
+        mxc_url = event.url
+        
+        o = urlparse(mxc_url)
+        domain = o.netloc
+        vid_code = o.path
+        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, vid_code)
         self.log.debug(url)
         
         for room_name, room_data in self.relayed_rooms.items():
