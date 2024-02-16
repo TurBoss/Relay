@@ -11,7 +11,16 @@ import re
 from time import sleep
 from io import StringIO
 
-from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessageImage, RoomMessageVideo, LoginResponse
+from nio import (
+                    AsyncClient,
+                    LoginResponse,
+                    MatrixRoom,
+                    RoomMessageText,
+                    RoomMessageImage,
+                    RoomMessageAudio,
+                    RoomMessageVideo,
+                    RoomMessageFile
+                )
 
 from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
@@ -22,10 +31,9 @@ from urllib.parse import urlparse
 loop = asyncio.get_event_loop()
 loop.set_debug(False)
 
-
 FORMAT = "[%(asctime)s] [%(name)s] [%(levelname)s]  %(message)s (%(filename)s:%(lineno)d)"
 
-#logging.basicConfig(filename='relay.log', level=logging.DEBUG, format=FORMAT)
+# logging.basicConfig(filename='relay.log', level=logging.DEBUG, format=FORMAT)
 logging.basicConfig(level=logging.DEBUG, format=FORMAT)
 
 logging.getLogger("asyncio").setLevel(logging.WARNING)
@@ -35,10 +43,12 @@ logging.getLogger("nio").setLevel(logging.WARNING)
 
 
 class Relay:
+
     def __init__(self,
                  matrix_host, matrix_domain, matrix_name, matrix_user, matrix_pwd,
                  irc_host, irc_port, irc_sasl, irc_user, irc_pwd,
                  relayed_rooms, log):
+        
         self.log = log
         self.matrix_host = matrix_host
         self.matrix_domain = matrix_domain
@@ -64,9 +74,11 @@ class Relay:
         ]
         
         self.matrix_client = AsyncClient(self.matrix_host, self.matrix_user)
-        self.matrix_client.add_event_callback(self.matrix_msg_handler, RoomMessageText)
-        self.matrix_client.add_event_callback(self.matrix_img_handler, RoomMessageImage)
-        self.matrix_client.add_event_callback(self.matrix_vid_handler, RoomMessageVideo)
+        self.matrix_client.add_event_callback(self.matrix_message_handler, RoomMessageText)
+        self.matrix_client.add_event_callback(self.matrix_image_handler, RoomMessageImage)
+        self.matrix_client.add_event_callback(self.matrix_video_handler, RoomMessageVideo)
+        self.matrix_client.add_event_callback(self.matrix_audio_handler, RoomMessageAudio)
+        self.matrix_client.add_event_callback(self.matrix_file_handler, RoomMessageFile)
         
         resp = await self.matrix_client.login(self.matrix_pwd, device_name="RelayHost")
         
@@ -76,7 +88,7 @@ class Relay:
             self.accepted_matrix = True
 
         else:
-            self.log.debug(f'homeserver = "{homeserver}"; user = "{user_id}"')
+            self.log.debug(f'homeserver = "{self.matrix_host}"; user = "{self.matrix_user}"')
             self.log.debug(f"Failed to log in: {resp}")
 
             sys.exit(1)
@@ -86,7 +98,7 @@ class Relay:
         self.irc_conn.register('*', self.irc_msg_handler)  
         
         await self.irc_conn.connect()
-                
+        
         # If you made a new room and haven't joined as that user, you can use
         for _, room in self.relayed_rooms.items():
             room_enabled = room["enabled"]
@@ -105,7 +117,6 @@ class Relay:
                 self.log.debug(f"NOTICE: {params}")
                 
         elif message.command == "PRIVMSG":
-            # self.log.debug(message.command, len(message.parameters))
             message_sender = message.prefix.ident
             sender_alias = message.prefix.nick
             if message_sender == self.irc_user:
@@ -129,7 +140,7 @@ class Relay:
         
         elif message.command == "900":
             self.accepted_irc = True
-            for _, room in self.relayed_rooms.items():                
+            for _, room in self.relayed_rooms.items(): 
                 room_enabled = room["enabled"]
                 if room_enabled:
                     msg = f"JOIN {room['irc_room']}"
@@ -140,14 +151,8 @@ class Relay:
             for params in range(len(message.parameters)):
                 self.log.debug(f"{params}")
     
-    
-    async def matrix_msg_handler(self, room: 'MatrixRoom', event: 'RoomMessageText') -> None:
-        # self.log.debug(
-        #     f"Message received in room {room.display_name} {room.room_id}\n"
-        #     f"{room.user_name(event.sender)} | {event.body}"
-        # )
+    async def matrix_message_handler(self, room: 'MatrixRoom', event: 'RoomMessageText') -> None:
         
-
         if not self.accepted_irc:
             return
         
@@ -170,15 +175,10 @@ class Relay:
             message_body = re.sub("\(@_discord_\d*:jauriarts.org\)", "", message_body)
         
         for room_name, room_data in self.relayed_rooms.items():
-            # self.log.debug(room_name, room_data)
             if matrix_room == room_data["matrix_room_id"]:
                 room_enabled = room_data['enabled']
                 if room_enabled:
                     irc_room = room_data['irc_room']
-                    
-                    # while message_body:
-                    # text = message_body[:400]
-                    # message_body = message_body[400:]
                     
                     for line_no, line in enumerate(StringIO(message_body)):
                         if line_no % 5 == 0:
@@ -189,13 +189,11 @@ class Relay:
                             line = line[200:]
                             # print(msg)
                             self.irc_conn.send_command(msg)
-                        
         
-    async def matrix_img_handler(self, room: 'MatrixRoom', event: 'RoomMessageImage') -> None:
+    async def matrix_image_handler(self, room: 'MatrixRoom', event: 'RoomMessageImage') -> None:
 
         if not self.accepted_irc:
             return
-
         
         await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
         
@@ -211,10 +209,8 @@ class Relay:
         domain = o.netloc
         pic_code = o.path
         url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, pic_code)
-        self.log.debug(url)
         
         for room_name, room_data in self.relayed_rooms.items():
-            # self.log.debug(room_name, room_data)
             if matrix_room == room_data["matrix_room_id"]:
                 room_enabled = room_data['enabled']
                 if room_enabled:
@@ -225,11 +221,10 @@ class Relay:
                         url = url[400:]
                         self.irc_conn.send_command(msg)
                         
-    async def matrix_vid_handler(self, room: 'MatrixRoom', event: 'RoomMessageVideo') -> None:
+    async def matrix_audio_handler(self, room: 'MatrixRoom', event: 'RoomMessageAudio') -> None:
 
         if not self.accepted_irc:
             return
-
         
         await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
         
@@ -243,12 +238,11 @@ class Relay:
         
         o = urlparse(mxc_url)
         domain = o.netloc
-        vid_code = o.path
-        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, vid_code)
-        self.log.debug(url)
+        audio_code = o.path
+        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, audio_code)
+
         
         for room_name, room_data in self.relayed_rooms.items():
-            # self.log.debug(room_name, room_data)
             if matrix_room == room_data["matrix_room_id"]:
                 room_enabled = room_data['enabled']
                 if room_enabled:
@@ -259,8 +253,72 @@ class Relay:
                         url = url[400:]
                         self.irc_conn.send_command(msg)
 
+    async def matrix_video_handler(self, room: 'MatrixRoom', event: 'RoomMessageVideo') -> None:
+
+        if not self.accepted_irc:
+            return
+        
+        await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
+        
+        message_sender = room.user_name(event.sender)
+        
+        if message_sender == self.matrix_name:
+            return
+        
+        matrix_room = room.room_id
+        mxc_url = event.url
+        
+        o = urlparse(mxc_url)
+        domain = o.netloc
+        video_code = o.path
+        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, video_code)
+
+        
+        for room_name, room_data in self.relayed_rooms.items():
+            if matrix_room == room_data["matrix_room_id"]:
+                room_enabled = room_data['enabled']
+                if room_enabled:
+                    irc_room = room_data['irc_room']
+                    
+                    while url:
+                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {url[:400]}"
+                        url = url[400:]
+                        self.irc_conn.send_command(msg)
+
+    async def matrix_file_handler(self, room: 'MatrixRoom', event: 'RoomMessageFile') -> None:
+
+        if not self.accepted_irc:
+            return
+        
+        await self.matrix_client.update_receipt_marker(room.room_id, event.event_id)
+        
+        message_sender = room.user_name(event.sender)
+        
+        if message_sender == self.matrix_name:
+            return
+        
+        matrix_room = room.room_id
+        mxc_url = event.url
+        
+        o = urlparse(mxc_url)
+        domain = o.netloc
+        file_code = o.path
+        url = "https://{0}/_matrix/media/v1/download/{0}{1}".format(domain, file_code)
+
+        
+        for room_name, room_data in self.relayed_rooms.items():
+            if matrix_room == room_data["matrix_room_id"]:
+                room_enabled = room_data['enabled']
+                if room_enabled:
+                    irc_room = room_data['irc_room']
+                    
+                    while url:
+                        msg = f"PRIVMSG {irc_room} :<{message_sender}> {url[:400]}"
+                        url = url[400:]
+                        self.irc_conn.send_command(msg)
+
+
 async def main(argv) -> None:
-    
     
     if len(argv) > 1:
         config_path = argv[1]
@@ -295,6 +353,7 @@ async def main(argv) -> None:
                   relayed_rooms, log)
     
     await relay.initialize()
+
 
 if __name__ == "__main__":
     try:

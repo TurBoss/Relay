@@ -1,3 +1,6 @@
 config.yaml
 config_prod.yaml
 config_debug.yaml
+.project
+.pydevproject
+venv/
